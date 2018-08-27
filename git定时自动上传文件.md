@@ -34,8 +34,12 @@ git push
 
 教程：https://blog.csdn.net/u013788943/article/details/81629645
 
+<<<<<<< HEAD
 ksjfskdfjlskdjfs 
 
 
 
 xiaoluoh
+=======
+ksjfskdfjlskdjfs aaaaaaa
+>>>>>>> ffcb915feda73a0b150c571a985b19f9094f9337
