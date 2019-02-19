@@ -12,12 +12,6 @@ http://www.runoob.com/linux/linux-system-contents.html
 
 
 
-hh 奇偶及
-
-
-
-fdf
-
 
 
 
