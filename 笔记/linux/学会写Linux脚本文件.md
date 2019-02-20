@@ -33,7 +33,7 @@ exit 0;
 
 
 
-ok啦！ 你可以试试直接输入autoUpdata
+ok啦！ 你可以试试直接输入autoUpda然后按下tab键，是不是就出来啦！
 
 
 
