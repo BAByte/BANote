@@ -72,7 +72,7 @@ adb pull [-a] <remote>... <local>
  不过滤
  adb logcat 
  
- 过滤出CIoTService的日志
+ 过滤出ccoService的日志
  adb logcat | grep [tag]
  
  
@@ -175,13 +175,13 @@ adb shell dumpsys window windows | grep mCurrent
 ## 根据包名查询进程号
 
 ~~~xml
-adb shell ps | grep com.cvte.ciot.service
+adb shell ps | grep com.ex.cco.service
 ~~~
 
 ## adb启动某个activity
 
 ~~~xml
-adb shell am start -n com.cvte.ciot.service/com.cvte.ciot.service.ui.activity.MainActivity
+adb shell am start -n com.ex.cco.service/com.ex.cco.service.ui.activity.MainActivity
 ~~~
 
 ## adb 启动某个服务
@@ -229,7 +229,7 @@ am broadcast -a MyAction --es city "shenzhen" --ei year 2014 --ez flag true
 adb shell pm list packages -f
 
 //查看是否已经有安装
-adb shell pm list packages -f | grep  com.cvte.ciot.service
+adb shell pm list packages -f | grep  com.ex.cco.service
 ~~~
 
  

@@ -585,11 +585,11 @@ tasks.register("hello2", HelloWorldTask) {
 
 目前自定义Task还是在自己的项目内，定义到其他项目试试：
 
-1. 新建一个根项目，用kotlin作为dsl
+新建一个根项目，用kotlin作为dsl。
 
 新建一个子项目：名为diy的groovy库。
 
-创建： src/main/groovy/com/ex/Hello.groovy
+创建： src/main/groovy/com/ex/Hello.groovy 。
 
 ~~~java
 package com.ex
@@ -644,7 +644,7 @@ uploadArchives {
 在diy项目导出库：
 
 ~~~java
- ~/gradle_demo/diy  gradle uploadArchives
+ ~/gradle_demo/diy$ gradle uploadArchives
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 7.0.
 Use '--warning-mode all' to show the individual deprecation warnings.
@@ -659,13 +659,26 @@ BUILD SUCCESSFUL in 573ms
 build.gradle.kts  (这里我用的是kotlin为dsl)
 
 ~~~java
+//gradle是由groovy语言编写的，支持groovy语法，可以灵活的使用已有的各种ant插件、基于jvm的类库，
+
+//这也是它比maven、 ant等构建脚本强大的原因。虽然gradle支持开箱即用，但是如果你想在脚本中使用一些第三方的插件、类库等，
+
+//就需要自己手动添加对这些插件、类库的 引用。而这些插件、类库又不是直接服务于项目的，而是支持其它build脚本的运行。
+
+//所以你应当将这部分的引用放置在buildscript代码块中。 gradle在执行脚本时，会优先执行buildscript代码块中的内容，
+
+//然后才会执行剩余的build脚本。
 buildscript {
     repositories {
         maven {
+          	//刚刚我们导出到本地了,所以仓库应该是我们的本地repo目录
             url = uri("./repo")
         }
     }
     dependencies {
+      //（组：库名：版本号）
+      //该classpath声 明说明了在执行其余的build脚本时，
+      //class loader可以使用这些你提供的依赖项
       classpath("com.ex:hello:1.0")
     }
 }
@@ -689,5 +702,212 @@ BUILD SUCCESSFUL in 493ms
 1 actionable task: 1 executed
 ~~~
 
+---
 
+# 自定义Plugin
+
+上文有说过：**task的导入方式之一就是通过Plugin。** 与task自定义一样，有三种方式。
+
+## 简单定义
+
+创建一个gradle_demo项目。编写build.gradle文件内容：
+
+~~~java
+//导入插件
+apply plugin: SayHelloWorld
+
+//插件apply到项目时，Gradle将创建插件类的实例，并调用该实例的Plugin.apply（）
+//指定泛型为Project，也就是指定类型为Gradle项目
+class SayHelloWorld implements Plugin<Project> {
+  	//项目实例被当做参数，插件可使用这个参数对项目进行配置
+    void apply(Project project) {
+     		//插件本提供了一个名为hello的task
+        project.task('hello') {
+            doLast {
+                println 'Hello from the plugin'
+            }
+        }
+    }
+}
+~~~
+
+现在可以在gradle_demo项目中执行hello的task：
+
+~~~java
+~/gradle_demo gradle hello
+
+> Task :hello
+Hello from the plugin
+
+BUILD SUCCESSFUL in 509ms
+1 actionable task: 1 executed
+~~~
+
+---
+
+# 插件定义在BuildSrc文件夹
+
+创建：buildSrc/src/main/groovy/com/ex/SayHelloWorld.groovy
+
+内容：
+
+~~~java
+package com.ex
+  
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+
+class SayHelloWorld implements Plugin<Project> {
+    void apply(Project project) {
+        project.task('hello') {
+            doLast {
+                println 'Hello from the plugin'
+            }
+        }
+    }
+}
+~~~
+
+builde.gradle中导入插件 :
+
+~~~java
+apply plugin: com.ex.SayHelloWorld
+~~~
+
+运行后结果是一样的
+
+# 使用扩展属性
+
+使用扩展属性实现可配置内容：由使用该插件的项目设置输出内容。
+
+新建：buildSrc/src/main/groovy/com/ex/Message.groovy：
+
+~~~java
+package com.ex
+
+class Message {
+  String value = 'default value'
+}
+~~~
+
+然后在plugin类声明Message类为自己的扩展属性：
+
+~~~java
+package com.ex
+
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+
+class SayHelloWorld implements Plugin<Project> {
+    void apply(Project project) {
+      	//声明一个扩展属性，别名为word
+        def extension = project.extensions.create('word', Message)
+        project.task('hello') {
+            doLast {
+             		//使用扩展属性输出
+                println "Hello ${extension.value}"
+            }
+        }
+    }
+}
+
+~~~
+
+在使用插件时可以指定属性的值：
+
+~~~java
+apply plugin: com.ex.SayHelloWorld
+
+//不指定的话就是默认值
+word {
+  value = 'I AM BA!'
+}
+~~~
+
+执行task结果：
+
+~~~java
+ ~/gradle_demo gradle hello
+
+> Task :hello
+Hello I AM BA!
+
+BUILD SUCCESSFUL in 571ms
+1 actionable task: 1 executed
+~~~
+
+# 使用Project对象处理文件
+
+上面说Plugin可以通过Project对象对项目做一些配置，下面使用Project对象对项目输出文件：
+
+定义一个扩展属性：buildSrc/src/main/groovy/com/ex/Dir.groovy
+
+~~~java
+package com.ex
+
+class Dir {
+  String dir
+}
+~~~
+
+
+
+定义一个写文件的Plugin：buildSrc/src/main/groovy/com/ex/OutPutHelloFile.groovy
+
+~~~java
+package com.ex
+
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+
+class OutPutHelloFile implements Plugin<Project> {
+    void apply(Project project) {
+        def extension = project.extensions.create('dir', Dir)
+        project.task('output') {
+            doLast {
+                def file = project.file(extension.dir)
+                file.parentFile.mkdirs()
+                file.write 'Hello I AM BA'
+            }
+        }
+    }
+}
+~~~
+
+
+
+在build.gradle使用：
+
+~~~java
+apply plugin: com.ex.OutPutHelloFile
+
+//声明要输出的目录
+dir {
+  dir = 'build/output/hello.txt'
+}
+
+//写一个task读文件
+task readFile {
+  doLast {
+    println file('build/output/hello.txt').text
+  }
+}
+~~~
+
+执行task：
+
+~~~java
+
+ ~/gradle_demo  gradle output
+
+BUILD SUCCESSFUL in 513ms
+1 actionable task: 1 executed
+ ~/gradle_demo  gradle readFile
+
+> Task :readFile
+Hello I AM BA
+
+BUILD SUCCESSFUL in 536ms
+1 actionable task: 1 executed
+~~~
 
