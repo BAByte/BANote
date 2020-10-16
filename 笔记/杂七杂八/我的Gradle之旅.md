@@ -32,6 +32,32 @@ DSL是 Domain Specific Language 的缩写，中文翻译为*领域特定语言*�
 
 显然Groovy和Kotlin在本文所涉及的领域起到了高效的作用。
 
+# Project和tasks
+
+ 在grade中的两⼤重要的概念，分别是project和tasks。每⼀次构建都是有⾄少⼀个project来完成， 所以Android studio中的project和Gradle中的project不是⼀个概念。每个project有⾄少⼀个tasks。 每⼀个build.grade⽂件代表着⼀个project。tasks在build.gradle中定义。当初始化构建进程，gradle 会基于build⽂件，集合所有的project和tasks,⼀个tasks包含了⼀系列动作，然后它们将会按照顺序 执⾏，⼀个动作就是⼀段被执⾏的代码，很像Java中的⽅法。
+
+# 构建的⽣命周期
+
+ ⼀旦⼀个tasks被执⾏，那么它不会再次执⾏了，不包含依赖的Tasks总是优先执⾏，⼀次构建将会 经历下列三个阶段： 
+
+1. 初始化阶段：project实例在这⼉创建，如果有多个模块，即有多个build.gradle⽂件，多个 project将会被创建。 
+2.  配置阶段：在该阶段，build.gradle脚本将会执⾏，为每个project创建和配置所有的tasks。 
+3. 执⾏阶段：这⼀阶段，gradle会决定哪⼀个tasks会被执⾏，哪⼀个tasks会被执⾏完全依赖开 始构建时传⼊的参数和当前所在的⽂件夹位置有关。
+
+
+
+# 依赖管理
+
+使用linux一定会有这样的一个经历：安装A程序，会提示你是否安装相关的依赖程序，选择yes会自动下载安装相关依赖程序。不需要用户自己去手动下载相关的依赖程序进行安装，很有意思对吧！
+
+当然也会有这样的情况：A程序依赖B程序，所以需要下载B程序进行安装，但是当前设置的软件源没有B程序，包管理工具就没有办法自动帮你下载B程序。这时要么你上网找B程序自己装，要么增加一些软件源。
+
+gradle有强大的依赖管理功能，无论是gradle插件还是java库，只需要添加一行代码，gradle就会自动帮你下载。
+
+Gradle包含了两种依赖引用方式：远程仓库或者本地仓库引入。
+
+详细的内容请移步：[依赖管理](https://segmentfault.com/a/1190000004237922)
+
 # Gradle的官网教程
 
 了解完一些基本概念后就可以去跟着官网的相关教程了。[官网教程](https://gradle.org/guides/#getting-started) 
@@ -52,7 +78,7 @@ Bulid Scans 被称为Gradle分析利器，Build Scans是用于开发和维护Gra
 
 ## 创建一个gradle的工作目录
 
-创建一个目录，然后在该目录
+创建一个目录，然后在该目录进行init：
 
 ~~~java
 gradle init
@@ -92,6 +118,23 @@ Project name (default: basic-demo):
 ├── gradlew.bat  //适用于Windows的Gradle Wrapper脚本
 └── settings.gradle  //用于配置Gradle构建的Gradle设置脚本
 ```
+
+# Gradle Wrapper 
+
+grade只是⼀个构建⼯具，版本总是在更迭，所以使⽤Gradle Wrapper将会是⼀个好的选择去避免由于gradle版本更新导致的问题。Gradle Wrapper提供了⼀个windows的batch⽂件和其他系统的 shell⽂件，当你使⽤这些脚本的时候，当前gradle版本将会被下载，并且会被⾃动⽤在项⽬的构建， 所以每个开发者在构建⾃⼰app的时候只需要使⽤Wrapper。所以开发者不需要为你的电脑安装任何 gradle版本，在mac上你只需要运⾏gradlew，⽽在windows上你只需要运⾏gradlew.bat。 你也可以利⽤命令⾏./gradlew -v来查看当前gradle版本。
+
+可以看到⼀个bat⽂件针对windows系统，⼀个shell脚本针对mac系统，⼀个jar⽂件，⼀个配置⽂ 件。配置⽂件包含以下信息：
+
+~~~java
+ #Sat May 30 17:41:49 CEST 2015 
+ distributionBase=GRADLE_USER_HOME 
+ distributionPath=wrapper/dists 
+ zipStoreBase=GRADLE_USER_HOME 
+ zipStorePath=wrapper/dists
+ distributionUrl=https\://services.gradle.org/distributions/gradle-2.4-all.zip 
+~~~
+
+你可以改变该url来改变你的gradle版本。
 
 # 编写第一个构建任务
 
@@ -140,9 +183,6 @@ task copy(type: Copy) {
 组名:Custom、描述：Copies sources to the dest directory
 
 ~~~java
-task hello(group: "Hello", description: "print hello world text") {
-    println 'Hello Gradle Task!'
-}
 task copy(type: Copy, group: "Custom", description: "Copies sources to the dest directory") {
     from "src"
     into "dest"
@@ -152,6 +192,8 @@ task copy(type: Copy, group: "Custom", description: "Copies sources to the dest 
 显示所有task
 
 ![image](https://github.com/BAByte/pic/blob/master/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_37e84f5b-e263-4199-8e60-8722c6bf4d48.png?raw=true)
+
+
 
 # 使用Plugin
 
@@ -169,7 +211,7 @@ plugins {
 }
 ~~~
 
-编写task
+编写task:把src目录压缩到build/distributions/basic-demo-1.0.zip中。
 
 ~~~java
 task zip(type: Zip, group: "Archive", description: "Archives sources in a zip file") {
@@ -178,7 +220,7 @@ task zip(type: Zip, group: "Archive", description: "Archives sources in a zip fi
 }
 ~~~
 
-执行后检查文件。
+执行一下这个task，就可以看到basic-demo-1.0.zip已经生成了。
 
 ---
 
@@ -659,7 +701,7 @@ BUILD SUCCESSFUL in 573ms
 build.gradle.kts  (这里我用的是kotlin为dsl)
 
 ~~~java
-//gradle是由groovy语言编写的，支持groovy语法，可以灵活的使用已有的各种ant插件、基于jvm的类库，
+//buildscript方法是定义了全局的相关属性,gradle是由groovy语言编写的，支持groovy语法，可以灵活的使用已有的各种ant插件、基于jvm的类库，
 
 //这也是它比maven、 ant等构建脚本强大的原因。虽然gradle支持开箱即用，但是如果你想在脚本中使用一些第三方的插件、类库等，
 
@@ -702,7 +744,13 @@ BUILD SUCCESSFUL in 493ms
 1 actionable task: 1 executed
 ~~~
 
----
+
+
+## Task的依赖
+
+task的主要核心是action，根据action队列顺序执行。在添加action时可以指定位置插入队列。
+
+
 
 # 自定义Plugin
 
@@ -743,9 +791,9 @@ BUILD SUCCESSFUL in 509ms
 1 actionable task: 1 executed
 ~~~
 
----
 
-# 插件定义在BuildSrc文件夹
+
+## 插件定义在BuildSrc文件夹
 
 创建：buildSrc/src/main/groovy/com/ex/SayHelloWorld.groovy
 
@@ -776,7 +824,9 @@ apply plugin: com.ex.SayHelloWorld
 
 运行后结果是一样的
 
-# 使用扩展属性
+
+
+## 使用扩展属性
 
 使用扩展属性实现可配置内容：由使用该插件的项目设置输出内容。
 
@@ -813,7 +863,9 @@ class SayHelloWorld implements Plugin<Project> {
 
 ~~~
 
-在使用插件时可以指定属性的值：
+
+
+## 在使用插件时可以指定属性的值：
 
 ~~~java
 apply plugin: com.ex.SayHelloWorld
@@ -836,7 +888,9 @@ BUILD SUCCESSFUL in 571ms
 1 actionable task: 1 executed
 ~~~
 
-# 使用Project对象处理文件
+
+
+使用Project对象处理文件
 
 上面说Plugin可以通过Project对象对项目做一些配置，下面使用Project对象对项目输出文件：
 
@@ -865,6 +919,7 @@ class OutPutHelloFile implements Plugin<Project> {
         def extension = project.extensions.create('dir', Dir)
         project.task('output') {
             doLast {
+              	//对使用该Plugin的project的文件目录进行操作
                 def file = project.file(extension.dir)
                 file.parentFile.mkdirs()
                 file.write 'Hello I AM BA'
@@ -886,7 +941,7 @@ dir {
   dir = 'build/output/hello.txt'
 }
 
-//写一个task读文件
+//写一个task读文件，当然也可以在plugin中定义一个读该文件的task
 task readFile {
   doLast {
     println file('build/output/hello.txt').text
@@ -910,4 +965,318 @@ Hello I AM BA
 BUILD SUCCESSFUL in 536ms
 1 actionable task: 1 executed
 ~~~
+
+
+
+## 插件独立项目
+
+创建一个dsl为groovy，名为gradle_demo的base项目, 再创建名为diy 的子项目,配置如下:
+
+~~~java
+ ~/gradle_demo/diy  gradle init
+Starting a Gradle Daemon, 1 stopped Daemon could not be reused, use --status for details
+
+Select type of project to generate:
+  1: basic
+  2: application
+  3: library
+  4: Gradle plugin
+Enter selection (default: basic) [1..4] 4
+
+Select implementation language:
+  1: Groovy
+  2: Java
+  3: Kotlin
+Enter selection (default: Java) [1..3] 1
+
+Select build script DSL:
+  1: Groovy
+  2: Kotlin
+Enter selection (default: Groovy) [1..2] 1
+
+Project name (default: diy):
+Source package (default: diy):
+
+> Task :init
+Get more help with your project: https://guides.gradle.org?q=Plugin%20Development
+
+BUILD SUCCESSFUL in 13s
+2 actionable tasks: 2 executed
+~~~
+
+然后可以看到：diy/src/main/groovy/diy/DiyPlugin.groovy
+
+~~~java
+/*
+ * 已经定义好了一个hello world程序，我们这次就直接用吧
+ */
+package diy
+
+import org.gradle.api.Project
+import org.gradle.api.Plugin
+
+/**
+ * A simple 'hello world' plugin.
+ */
+public class DiyPlugin implements Plugin<Project> {
+    public void apply(Project project) {
+        // Register a task
+        project.tasks.register("greeting") {
+            doLast {
+                println("Hello from plugin 'diy.greeting'")
+            }
+        }
+    }
+}
+
+~~~
+
+修改diy项目的build.gradle,增加maven插件，因为我们要将插件发布到本地 :
+
+~~~java
+plugins {
+		...
+    // 该插件提供gradlePlugin  task
+    id 'java-gradle-plugin'
+
+    // Apply the Groovy plugin to add support for Groovy
+    id 'groovy'
+      
+    //添加maven插件
+    id 'maven'
+}
+
+//组
+group = 'com.ex'
+//版本号
+version = '1.0'
+//导出的库会被重命名为hello，并且放在“包名/hello/”目录下
+archivesBaseName = 'hello'
+
+//执行这个task，就可以把库导出到上级目录的repo文件夹下
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: uri('../repo')) //这里应该是指定服务器地址的，但是我们这里导出到本地
+        }
+    }
+}
+
+// 会自动帮我们关联id和具体实现类到:
+//diy/build/resources/main/META-INF/gradle-plugins/diy.greeting.properties
+gradlePlugin {
+    // Define the plugin
+    plugins {
+        greeting {
+          	//这个id用来给其他项目使用
+            id = 'diy.greeting'
+            implementationClass = 'diy.DiyPlugin'
+        }
+    }
+}
+~~~
+
+在根项目的build.gradle指定classpath：
+
+~~~java
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+          	//刚刚我们导出到本地了,所以仓库应该是我们的本地repo目录
+            url = uri("./repo")
+        }
+    }
+    dependencies {
+      //（组：库名：版本号）
+      //该classpath声 明说明了在执行其余的build脚本时，
+      //class loader可以使用这些你提供的依赖项
+      classpath("com.ex:hello:1.0")
+    }
+}
+~~~
+
+新建一个app子项目
+
+~~~java
+ ~/gradle_demo  mkdir app
+ ~/gradle_demo  cd app
+ ~/gradle_demo/app  gradle init
+
+Select type of project to generate:
+  1: basic
+  2: application
+  3: library
+  4: Gradle plugin
+Enter selection (default: basic) [1..4] 2
+
+Select implementation language:
+  1: C++
+  2: Groovy
+  3: Java
+  4: Kotlin
+  5: Swift
+Enter selection (default: Java) [1..5]
+
+Select build script DSL:
+  1: Groovy
+  2: Kotlin
+Enter selection (default: Groovy) [1..2]
+
+Select test framework:
+  1: JUnit 4
+  2: TestNG
+  3: Spock
+  4: JUnit Jupiter
+Enter selection (default: JUnit 4) [1..4]
+
+Project name (default: app):
+Source package (default: app):
+
+> Task :init
+Get more help with your project: https://docs.gradle.org/6.5.1/userguide/tutorial_java_projects.html
+
+BUILD SUCCESSFUL in 11s
+2 actionable tasks: 2 executed
+~~~
+
+然后在根项目的settings.gradle文件导入app项目：
+
+~~~java
+include 'app'
+rootProject.name = 'gradle_demo'
+~~~
+
+接下来在app项目导入插件:
+
+~~~java
+plugins {
+    // Apply the java plugin to add support for Java
+    id 'java'
+
+    // Apply the application plugin to add support for building a CLI application.
+    id 'application'
+
+    //导入我们自定义的插件
+    id 'diy.greeting'
+}
+~~~
+
+在根项目中执行task --all 列出所有的task：
+
+~~~java
+ ~/gradle_demo  gradle task --all
+...
+
+Other tasks
+-----------
+app:greeting  //可以看到app项目已经导入了我们的自定义plugin
+ 
+BUILD SUCCESSFUL in 530ms
+1 actionable task: 1 executed
+ ~/gradle_demo 
+~~~
+
+执行一下：
+
+~~~java
+ ~/gradle_demo  gradle app:greeting
+
+> Task :app:greeting
+Hello from plugin 'diy.greeting'
+
+BUILD SUCCESSFUL in 530ms
+1 actionable task: 1 executed
+ ~/gradle_demo 
+~~~
+
+# [新的Maven发布插件](https://docs.gradle.org/current/userguide/publishing_maven.html#publishing_maven)
+
+ [Maven 翻译为"专家"、"内行"，是 Apache 下的一个纯 Java 开发的开源项目。基于项目对象模型（缩写：POM）概念，Maven利用一个中央信息片断能管理一个项目的构建、报告和文档等步骤。Maven 是一个项目管理工具，可以对 Java 项目进行构建、依赖管理。](https://www.runoob.com/maven/maven-tutorial.html)
+
+在上文中我们使用maven插件对自定义插件进行了构建和发布。除了gradle plugin外，在实际开发中我们也会写一些java jar开源库。所以学会使用gradle的maven插件也是很重要的。
+
+## [Maven pom ](https://docs.gradle.org/current/dsl/org.gradle.api.publish.maven.MavenPom.html)
+
+Maven pom 可以当成是gradle的build.gradle文件理解。有关maven pom 的详细内容请点击上方标题。
+
+## Maven Publish Plugin
+
+上文中使用的Maven插件是旧版的。
+
+下面使用新版的maven插件：将上文的“插件独立项目”插件发布到本地：
+
+~~~java
+//引入插件
+plugins {    id 'maven-publish' }
+
+publishing {
+    publications {
+        hello(MavenPublication) {
+        //组
+        groupId = 'com.ex'
+        artifactId = 'hello'
+        //版本号
+        version = '1.0'
+        from components.java
+        }
+    }
+
+    repositories {
+        maven {
+          //发布到hello仓库
+            name = 'hello'
+          //将包发布到上级目录的repo文件夹
+            url = uri("../repo")
+        }
+    }
+}
+~~~
+
+运行gradle task --all 看一下该插件有哪些task
+
+~~~java
+Publishing tasks
+----------------
+diy:generateMetadataFileForGreetingPluginMarkerMavenPublication 
+  - Generates the Gradle metadata file for publication 'greetingPluginMarkerMaven'.
+diy:generateMetadataFileForHelloPublication 
+  - Generates the Gradle metadata file for publication 'hello'.
+diy:generateMetadataFileForPluginMavenPublication 
+  - Generates the Gradle metadata file for publication 'pluginMaven'.
+diy:generatePomFileForGreetingPluginMarkerMavenPublication 
+  - Generates the Maven POM file for publication 'greetingPluginMarkerMaven'.
+diy:generatePomFileForHelloPublication 
+  - Generates the Maven POM file for publication 'hello'.
+diy:generatePomFileForPluginMavenPublication
+  - Generates the Maven POM file for publication 'pluginMaven'.
+diy:publish - Publishes all publications produced by this project.
+diy:publishAllPublicationsToHelloRepository 
+  - Publishes all Maven publications produced by this project to the hello repository.
+diy:publishGreetingPluginMarkerMavenPublicationToHelloRepository 
+  - Publishes Maven publication 'greetingPluginMarkerMaven' to Maven repository 'hello'.
+diy:publishGreetingPluginMarkerMavenPublicationToMavenLocal 
+  - Publishes Maven publication 'greetingPluginMarkerMaven' to the local Maven repository.
+diy:publishHelloPublicationToHelloRepository 
+  - Publishes Maven publication 'hello' to Maven repository 'hello'.
+diy:publishHelloPublicationToMavenLocal 
+  - Publishes Maven publication 'hello' to the local Maven repository.
+diy:publishPluginMavenPublicationToHelloRepository 
+  - Publishes Maven publication 'pluginMaven' to Maven repository 'hello'.
+diy:publishPluginMavenPublicationToMavenLocal 
+  - Publishes Maven publication 'pluginMaven' to the local Maven repository.
+diy:publishToMavenLocal 
+  - Publishes all Maven publications produced by this project to the local Maven cache.
+~~~
+
+注释写的很清楚了，我需要的是publishHelloPublicationToHelloRepository：
+
+~~~java
+ ~/gradle_demo  gradle publishHelloPublicationToHelloRepository
+
+BUILD SUCCESSFUL in 1s
+7 actionable tasks: 7 executed
+~~~
+
+根项目就多了个repo文件夹啦，就可以在其他项目愉快地使用了。
 
