@@ -75,10 +75,6 @@ class DataLoader : MyLifecycleListener, CoroutineScope by MainScope() {
 }
 ~~~
 
-下面你可以运行程序，然后等个8秒，就是上文说的场景 1 。这时候观察日志有没有输出：load data success。
-
-运行程序，然后马上按下返回键关闭程序，就是上文说的场景 2 。这时候日志没有输出：load data success。代表在Activity销毁的同时，我们取消了加载数据。
-
 # 与Activity生命周期关联
 
 其实不太需要知道onCreate事件，所以我这里没写
@@ -99,7 +95,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
   	//各个生命周期回调中调用，这里可能会阻塞线程，但不是本文重点，所以不管
     override fun onStart() {
         super.onStart()
-        loader.onStart()
+        loader.onDeliverStart()
     }
 
     override fun onResume() {
@@ -123,8 +119,6 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
     }
 }
 ~~~
-
----
 
 MainActitvity的布局代码
 
@@ -150,15 +144,21 @@ MainActitvity的布局代码
 </androidx.constraintlayout.widget.ConstraintLayout>
 ~~~
 
+下面你可以运行程序，然后等个8秒,观察日志有输出：load data success。就是上文说的场景 1 。
+
+运行程序，然后马上按下返回键关闭程序, 这时候日志没有输出：load data success。代表在Activity销毁的同时，我们取消了加载数据。就是上文说的场景 2 。
+
 # 小结
 
-看起来很low对不对，只能给一个类实现监听，我想给10个类赋予监听Activity生命周期的能力怎么办？对于熟读设计模式的大佬很容易就想到了观察者模式。
+看起来很low对不对，只能给一个类实现监听，我想给10个类赋予监听Activity生命周期的能力怎么办？
+
+对于熟读设计模式的大佬很容易就想到了观察者模式。
 
 # 使用观察者模式简单优化一下
 
 定义一个LifecycleStation，简单的管理所有的观察者
 
-ps:可以把生命周期的各个阶段定义为事件进行分发，我这里不将生命周期的各个阶段定义为具体事件。
+ps:应该把生命周期的各个阶段定义为事件进行分发，我这里不将生命周期的各个阶段定义为具体事件。（我懒）
 
 ~~~java
 class LifecycleStation:MyLifecycleListener{
@@ -177,14 +177,14 @@ class LifecycleStation:MyLifecycleListener{
   	//生命周期事件的处理
     override fun onDeliverDestroy() {
         observers.forEach{
-            it.onDestroy()
+            it.onDeliverDestroy()
         }
         observers.clear()
     }
   
 	 override fun onDeliverStart() {
         observers.forEach{
-            it.onStart()
+            it.onDeliverStart()
         }
     }
   
@@ -253,17 +253,17 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
 但是问题也有：我们需要在每一个Activity生命周期回调方法中使用lifecycleStation。是不是很烦？重复的写模板代码是每个开发最不愿意做的事情。
 
-最容易想到的方法就是写一个BaseActivity。这个没有问题，很合理！
+**最容易想到的方法就是写一个BaseActivity。**
 
-我们现在使用的Activity都是androidx库中的，继承关系如下：
+这个想法没有问题，很合理！下面证明一下：我们现在使用的Activity都是androidx库中的，继承关系如下：
 
 ~~~java
 class MainActivity : AppCompatActivity()
-class AppCompatActivity extends FragmentActivity //FragmentActivity 与navigation有关
-public class FragmentActivity extends ComponentActivity //与LifecycleOwner和按键分发有关
+class AppCompatActivity extends FragmentActivity 
+public class FragmentActivity extends ComponentActivity 
 ~~~
 
-对于谷歌的开发者来说，BaseActivity就是ComponentActivity。
+对于谷歌的开发者来说，BaseActivity就是ComponentActivity。lifecycle的实现就是在ComponentActivity里面
 
 # 使用BaseActivity
 
@@ -320,7 +320,7 @@ MainActivity的代码一下子就清爽了，但是还是存在问题，假设�
 
 # 使用Fragment监听Activity的生命周期
 
-新加一个接口用来获取 LifecycleStation
+新加一个接口给Fragment获取 LifecycleStation
 
 ~~~
 interface LifecycleStationOwner{
@@ -328,7 +328,7 @@ interface LifecycleStationOwner{
 }
 ~~~
 
-在Fragment监听事件：
+然后在Fragment关联activity生命周期，并使用LifecycleStation将事件分发给所有观察者：
 
 ~~~java
 
@@ -397,15 +397,15 @@ abstract class BaseActivity : AppCompatActivity(), LifecycleStationOwner {
 }
 ~~~
 
-碎片的生命周期就和Activiyt进行关联，而我们的DataLoader通过LifecycleStation也可以感知Activity的生命周期啦！
+碎片的生命周期和Activiyt已经进行了关联，DataLoader通过LifecycleStation也可以感知Activity的生命周期啦！
 
 # 小结
 
-假设我们把DataLoader换个名字：ViewModel。是不是就有点jetpack味道了？假设我们再把DataLoader的load方法改成使用livedata，是不是就更有jetpack的味道了？
+假设我们再把DataLoader的load方法改成使用livedata，再把DataLoader换个名字：ViewModel。是不是就有jetpack的味道了？
 
-lifecycle的实现并和上文中的差不多。只是我懒，直接把事件变成回调了。
+Lifecycle的实现和上文中的差不多：使用Fragment可以感知Activity生命周期的特性，再结合观察者模式，实现一套生命周期事件分发机制。（只是我懒，直接把事件分发变成方法回调。）
 
-他还有注解的用法，但是思想和上面一样：使用Fragment本来就可以感知Activity生命周期的特性，再结合观察者模式，实现的一套生命周期事件分发机制。
+Lifecycler还有注解等用法，
 
 # 从源码分析
 
