@@ -320,38 +320,62 @@ MainActivity的代码一下子就清爽了，但是还是存在问题，假设�
 
 # 使用Fragment监听Activity的生命周期
 
+新加一个接口用来获取 LifecycleStation
+
+~~~
+interface LifecycleStationOwner{
+    fun getLifecycleListener():MyLifecycleListener
+}
+~~~
+
+在Fragment监听事件：
+
 ~~~java
-import androidx.fragment.app.Fragment
+
 class LifeCycleFragment : Fragment() {
-    val lifecycle: LifecycleStation = LifecycleStation()
-		//声明一个tag
     companion object {
-        const val LIFECYCLE_FRAGMENT_TAG = "com.example.lifecycle"
+        private const val LIFECYCLE_FRAGMENT_TAG = "com.example.lifecycle"
+				//和Activity生命周期进行绑定
+        @JvmStatic
+        fun registerLifeCycleFragment(activity: AppCompatActivity) {
+            activity.supportFragmentManager.run {
+                //将lifeCycleFragment与activity的生命周期绑定,防止多次添加
+                if (findFragmentByTag(LifeCycleFragment.LIFECYCLE_FRAGMENT_TAG) == null) {
+                    beginTransaction()
+                        .add(
+                            LifeCycleFragment(),
+                            LifeCycleFragment.LIFECYCLE_FRAGMENT_TAG
+                        )
+                        .commit()
+                    executePendingTransactions()
+                }
+            }
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        lifecycle.onDeliverStart()
+        (requireActivity() as LifecycleStationOwner ).getLifecycleListener().onDeliverStart()
     }
 
     override fun onResume() {
         super.onResume()
-        lifecycle.onDeliverResume()
+        (requireActivity() as LifecycleStationOwner ).getLifecycleListener().onDeliverResume()
     }
 
     override fun onPause() {
         super.onPause()
-        lifecycle.onDeliverPause()
+        (requireActivity() as LifecycleStationOwner ).getLifecycleListener().onDeliverPause()
     }
 
     override fun onStop() {
         super.onStop()
-        lifecycle.onDeliverStop()
+        (requireActivity() as LifecycleStationOwner ).getLifecycleListener().onDeliverStop()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        lifecycle.onDeliverDestroy()
+        (requireActivity() as LifecycleStationOwner ).getLifecycleListener().onDeliverDestroy()
     }
 }
 ~~~
@@ -359,20 +383,16 @@ class LifeCycleFragment : Fragment() {
 baseActivity的代码也改一下
 
 ~~~java
-abstract class BaseActivity : AppCompatActivity() {
-    lateinit var lifecycleStation: LifecycleStation
+abstract class BaseActivity : AppCompatActivity(), LifecycleStationOwner {
+    val lifecycleStation: LifecycleStation = LifecycleStation()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //将lifeCycleFragment与activity的生命周期绑定,防止多次添加
-        if (supportFragmentManager.findFragmentByTag(LifeCycleFragment.LIFECYCLE_FRAGMENT_TAG) == null) {
-            supportFragmentManager.beginTransaction()
-                .add(
-                    LifeCycleFragment().apply { lifecycleStation = lifecycle },
-                    LifeCycleFragment.LIFECYCLE_FRAGMENT_TAG
-                )
-                .commit()
-            supportFragmentManager.executePendingTransactions()
-        }
+        //注册一下
+        LifeCycleFragment.registerLifeCycleFragment(this)
+    }
+
+    override fun getLifecycleListener(): MyLifecycleListener {
+        return lifecycleStation
     }
 }
 ~~~
@@ -383,9 +403,9 @@ abstract class BaseActivity : AppCompatActivity() {
 
 假设我们把DataLoader换个名字：ViewModel。是不是就有点jetpack味道了？假设我们再把DataLoader的load方法改成使用livedata，是不是就更有jetpack的味道了？
 
-lifecycle的实现并没有上文写的这么简单，他还有注解的用法，但是他的思想大致就是和上面一样：使用Fragment本来就可以感知Activity生命周期的特性，再结合观察者模式，实现的一套生命周期事件分发机制。
+lifecycle的实现并和上文中的差不多。只是我懒，直接把事件变成回调了。
 
-
+他还有注解的用法，但是思想和上面一样：使用Fragment本来就可以感知Activity生命周期的特性，再结合观察者模式，实现的一套生命周期事件分发机制。
 
 # 从源码分析
 
