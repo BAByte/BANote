@@ -409,4 +409,263 @@ Lifecycler还有注解等用法，
 
 # 从源码分析
 
-先欠着
+~~~java
+package androidx.activity.ComponentActivity
+  
+//ComponentActivity实现了一个LifecycleOwner接口
+public class ComponentActivity extends androidx.core.app.ComponentActivity implements
+        LifecycleOwner... {
+  						//观察者模式的事件分发中心
+         			private final LifecycleRegistry mLifecycleRegistry = new LifecycleRegistry(this);
+        }
+~~~
+
+上文说到androidX的继承关系，ComponentActivity就是BaseActivity。
+
+看上方代码：ComponentActivity实现了一个LifecycleOwner接口:
+
+~~~JAVA
+/**
+ * A class that has an Android lifecycle. These events can be used by custom components to
+ * handle lifecycle changes without implementing any code inside the Activity or the Fragment.
+ *
+ * @see Lifecycle
+ */
+@SuppressWarnings({"WeakerAccess", "unused"})
+public interface LifecycleOwner {
+    /**
+     * Returns the Lifecycle of the provider.
+     *
+     * @return The lifecycle of the provider.
+     */
+    @NonNull
+    Lifecycle getLifecycle();
+}
+~~~
+
+LifecycleOwner和我们上面例子的LifecycleStationOwner功能差不多：获取观察者模式的订阅中心。我们上文的订阅中心是LifecycleStation。而源码的订阅中心是LifecycleRegistry。
+
+# LifecycleRegistry
+
+我们看看LifecycleRegistry的代码：
+
+~~~JAVA
+/**
+ * An implementation of {@link Lifecycle} that can handle multiple observers.
+ * <p>
+ * It is used by Fragments and Support Library Activities. You can also directly use it if you have
+ * a custom LifecycleOwner.
+ */
+public class LifecycleRegistry extends Lifecycle {
+  ...
+}
+~~~
+
+英文注释写的很清楚，他和上文写的LifecycleStation一样，被用在Fragment里面。我们先看Lifecycle定义了什么：
+
+很长但是不复杂，和上文定义的MyLifecycleListener意义上差不多，区别是：Lifecycle把生命周期的阶段作为事件，不仅是Activity的生命周期，还有LifecycleOwner的生命周期（下文会说明原因）。
+
+~~~java
+public abstract class Lifecycle {
+    /**
+     * Adds a LifecycleObserver that will be notified when the LifecycleOwner changes
+     * state.
+     * <p>
+     * The given observer will be brought to the current state of the LifecycleOwner.
+     * For example, if the LifecycleOwner is in {@link State#STARTED} state, the given observer
+     * will receive {@link Event#ON_CREATE}, {@link Event#ON_START} events.
+     *
+     * @param observer The observer to notify.
+     */
+    @MainThread
+    public abstract void addObserver(@NonNull LifecycleObserver observer);
+
+    /**
+     * Removes the given observer from the observers list.
+     * <p>
+     * If this method is called while a state change is being dispatched,
+     * <ul>
+     * <li>If the given observer has not yet received that event, it will not receive it.
+     * <li>If the given observer has more than 1 method that observes the currently dispatched
+     * event and at least one of them received the event, all of them will receive the event and
+     * the removal will happen afterwards.
+     * </ul>
+     *
+     * @param observer The observer to be removed.
+     */
+    @MainThread
+    public abstract void removeObserver(@NonNull LifecycleObserver observer);
+
+    /**
+     * Returns the current state of the Lifecycle.
+     *
+     * @return The current state of the Lifecycle.
+     */
+    @MainThread
+    @NonNull
+    public abstract State getCurrentState();
+
+    @SuppressWarnings("WeakerAccess")
+    public enum Event {
+        /**
+         * Constant for onCreate event of the {@link LifecycleOwner}.
+         */
+        ON_CREATE,
+   ...
+    }
+
+    /**
+     * Lifecycle states. You can consider the states as the nodes in a graph and
+     * {@link Event}s as the edges between these nodes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public enum State {
+        /**
+         * Destroyed state for a LifecycleOwner. After this event, this Lifecycle will not dispatch
+         * any more events. For instance, for an {@link android.app.Activity}, this state is reached
+         * <b>right before</b> Activity's {@link android.app.Activity#onDestroy() onDestroy} call.
+         */
+        DESTROYED,
+
+   ...
+     
+    }
+}
+
+~~~
+
+回到LifecycleRegistry
+
+~~~java
+public class LifecycleRegistry extends Lifecycle {
+    /**
+     * 支持在遍历时移除观察者，实现的放应该就是设置观察者的生命周期
+     * Custom list that keeps observers and can handle removals / additions during traversal.
+     * 
+     * 根据观察者的生命周期去决定要不要把Activity的生命周期事件分发给观察者
+     * Invariant: at any moment of time for observer1 & observer2:
+     * if addition_order(observer1) < addition_order(observer2), then
+     * state(observer1) >= state(observer2),
+     */
+    private FastSafeIterableMap<LifecycleObserver, ObserverWithState> mObserverMap =
+            new FastSafeIterableMap<>();
+		@Override
+    public void addObserver(@NonNull LifecycleObserver observer) {
+        State initialState = mState == DESTROYED ? DESTROYED : INITIALIZED;
+        ObserverWithState statefulObserver = new ObserverWithState(observer, initialState);
+      	//存入观察者对象已经观察者对象的状态，原因看上方注释
+        ObserverWithState previous = mObserverMap.putIfAbsent(observer, statefulObserver);
+    }
+}
+~~~
+
+上文说的：根据观察者的生命周期去决定要不要把Activity的生命周期事件分发给观察者。是我的猜想，正确性待考证。本文重点是了解lifecycle的设计结构，而不是纠结在这些具体细节。
+
+接下来我们看看Fragment是怎么使用LifecycleRegistry，并将事件分发给观察者们的。
+
+在此之前，我们要先看Fragment和Activity的绑定的代码：
+
+~~~java
+public class ComponentActivity extends androidx.core.app.ComponentActivity implements
+        LifecycleOwner { 
+  ...
+@Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+       //重点是这里
+        ReportFragment.injectIfNeededIn(this);
+    }
+~~~
+
+所以是由ReportFragment负责关联Activity的生命周期，这里和我们上文的例子一样：在BaseActivity调用Fragment的静态方法把“自己”添加到Activity中。下面看看injectIfNeededIn方法：
+
+~~~java
+  public static void injectIfNeededIn(Activity activity) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            // On API 29+, we can register for the correct Lifecycle callbacks directly
+            activity.registerActivityLifecycleCallbacks(
+                    new LifecycleCallbacks());
+        }
+        // Prior to API 29 and to maintain compatibility with older versions of
+        // ProcessLifecycleOwner (which may not be updated when lifecycle-runtime is updated and
+        // need to support activities that don't extend from FragmentActivity from support lib),
+        // use a framework fragment to get the correct timing of Lifecycle events
+        android.app.FragmentManager manager = activity.getFragmentManager();
+        if (manager.findFragmentByTag(REPORT_FRAGMENT_TAG) == null) {
+            manager.beginTransaction().add(new ReportFragment(), REPORT_FRAGMENT_TAG).commit();
+            // Hopefully, we are the first to make a transaction.
+            manager.executePendingTransactions();
+        }
+    }
+~~~
+
+和我们上文写的例子一样吧！！把自己添加到Activity中，再看看Fragment碎片的回调方法：
+
+~~~java
+public class ReportFragment extends Fragment {
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+     		//这是分发给谁，我就不细纠了
+        dispatchCreate(mProcessListener);
+      	//分发给观察者
+        dispatch(Lifecycle.Event.ON_CREATE);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        dispatchStart(mProcessListener);
+        dispatch(Lifecycle.Event.ON_START);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        dispatchResume(mProcessListener);
+        dispatch(Lifecycle.Event.ON_RESUME);
+    }
+  
+    
+  static void dispatch(@NonNull Activity activity, @NonNull Lifecycle.Event event) {
+    		//有两种的原因为了适配android.support.v7.app.AppCompatActivity
+        if (activity instanceof LifecycleRegistryOwner) {
+          	//从Activity中获取到LifecycleRegistry，然后进行事件分发
+            ((LifecycleRegistryOwner) activity).getLifecycle().handleLifecycleEvent(event);
+            return;
+        }
+
+     		//这里的acticity是androidx的Activity，从Activity中获取到LifecycleRegistry，然后进行事件分发
+        if (activity instanceof LifecycleOwner) {
+            Lifecycle lifecycle = ((LifecycleOwner) activity).getLifecycle();
+            if (lifecycle instanceof LifecycleRegistry) {
+                ((LifecycleRegistry) lifecycle).handleLifecycleEvent(event);
+            }
+        }
+    }
+  
+    private void dispatchCreate(ActivityInitializationListener listener) {
+        if (listener != null) {
+            listener.onCreate();
+        }
+    }
+
+    private void dispatchStart(ActivityInitializationListener listener) {
+        if (listener != null) {
+            listener.onStart();
+        }
+    }
+
+    private void dispatchResume(ActivityInitializationListener listener) {
+        if (listener != null) {
+            listener.onResume();
+        }
+    }
+}
+~~~
+
+# 总结
+
+实现的总体思路：
+
+利用Fragment能关联Activity生命周期的特性，在ComponentActivity中将ReportFragment添加到“自己”里面，ComponentActivity有LifecycleRegistry（观察者订阅中心），所有的观察者只需要在ComponentActivity的LifecycleRegistry订阅生命周期事件。
