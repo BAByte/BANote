@@ -463,7 +463,7 @@ public class LifecycleRegistry extends Lifecycle {
 
 英文注释写的很清楚，他和上文写的LifecycleStation一样，被用在Fragment里面。我们先看Lifecycle定义了什么：
 
-很长但是不复杂，和上文定义的MyLifecycleListener意义上差不多，区别是：Lifecycle把生命周期的阶段作为事件，不仅是Activity的生命周期，还有LifecycleOwner的生命周期（下文会说明原因）。
+ps: 下面代码很长但是不复杂，和上文定义的MyLifecycleListener意义上差不多，区别是：Lifecycle把生命周期的阶段作为事件，不仅是Activity的生命周期，还有LifecycleOwner的生命周期（下文会说明原因）。
 
 ~~~java
 public abstract class Lifecycle {
@@ -534,7 +534,7 @@ public abstract class Lifecycle {
 
 ~~~
 
-回到LifecycleRegistry
+下面我们回到LifecycleRegistry代码，看看他管理观察者的方式是list还是map：
 
 ~~~java
 public class LifecycleRegistry extends Lifecycle {
@@ -548,7 +548,7 @@ public class LifecycleRegistry extends Lifecycle {
      * state(observer1) >= state(observer2),
      */
     private FastSafeIterableMap<LifecycleObserver, ObserverWithState> mObserverMap =
-            new FastSafeIterableMap<>();
+            new FastSafeIterableMap<>(); //是个map
 		@Override
     public void addObserver(@NonNull LifecycleObserver observer) {
         State initialState = mState == DESTROYED ? DESTROYED : INITIALIZED;
@@ -559,7 +559,9 @@ public class LifecycleRegistry extends Lifecycle {
 }
 ~~~
 
-上文说的：根据观察者的生命周期去决定要不要把Activity的生命周期事件分发给观察者。是我的猜想，正确性待考证。本文重点是了解lifecycle的设计结构，而不是纠结在这些具体细节。
+上面代码注释中：根据观察者的生命周期去决定要不要把Activity的生命周期事件分发给观察者。这是我的猜想，正确性待考证。
+
+本文重点是了解lifecycle的设计结构，而不是纠结在这些具体细节。
 
 接下来我们看看Fragment是怎么使用LifecycleRegistry，并将事件分发给观察者们的。
 
@@ -599,7 +601,7 @@ public class ComponentActivity extends androidx.core.app.ComponentActivity imple
     }
 ~~~
 
-和我们上文写的例子一样吧！！把自己添加到Activity中，再看看Fragment碎片的回调方法：
+和我们上文写的例子一样吧！！把自己添加到Activity中，再看看Fragment的回调方法：
 
 ~~~java
 public class ReportFragment extends Fragment {
@@ -626,24 +628,6 @@ public class ReportFragment extends Fragment {
         dispatch(Lifecycle.Event.ON_RESUME);
     }
   
-    
-  static void dispatch(@NonNull Activity activity, @NonNull Lifecycle.Event event) {
-    		//有两种的原因为了适配android.support.v7.app.AppCompatActivity
-        if (activity instanceof LifecycleRegistryOwner) {
-          	//从Activity中获取到LifecycleRegistry，然后进行事件分发
-            ((LifecycleRegistryOwner) activity).getLifecycle().handleLifecycleEvent(event);
-            return;
-        }
-
-     		//这里的acticity是androidx的Activity，从Activity中获取到LifecycleRegistry，然后进行事件分发
-        if (activity instanceof LifecycleOwner) {
-            Lifecycle lifecycle = ((LifecycleOwner) activity).getLifecycle();
-            if (lifecycle instanceof LifecycleRegistry) {
-                ((LifecycleRegistry) lifecycle).handleLifecycleEvent(event);
-            }
-        }
-    }
-  
     private void dispatchCreate(ActivityInitializationListener listener) {
         if (listener != null) {
             listener.onCreate();
@@ -659,6 +643,23 @@ public class ReportFragment extends Fragment {
     private void dispatchResume(ActivityInitializationListener listener) {
         if (listener != null) {
             listener.onResume();
+        }
+    }
+  
+  static void dispatch(@NonNull Activity activity, @NonNull Lifecycle.Event event) {
+    		//有两种的原因为了适配android.support.v7.app.AppCompatActivity
+        if (activity instanceof LifecycleRegistryOwner) {
+          	//从Activity中获取到LifecycleRegistry，然后进行事件分发
+            ((LifecycleRegistryOwner) activity).getLifecycle().handleLifecycleEvent(event);
+            return;
+        }
+
+     		//这里的acticity是androidx的Activity，从Activity中获取到LifecycleRegistry，然后进行事件分发
+        if (activity instanceof LifecycleOwner) {
+            Lifecycle lifecycle = ((LifecycleOwner) activity).getLifecycle();
+            if (lifecycle instanceof LifecycleRegistry) {
+                ((LifecycleRegistry) lifecycle).handleLifecycleEvent(event);
+            }
         }
     }
 }
