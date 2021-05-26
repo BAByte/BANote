@@ -98,7 +98,7 @@ Render Thread要从Main Thread同步DIsplayList，传给Gpu进行渲染到buffer
 >
 > 光栅化处理使用了gpu，然而browser端在RenderThread又渲染了一次，也就出现了重复渲染的问题。后来谷歌使用mailbox机制让gpu客户端进行纹理的共享，在render端渲染的纹理直接可以通过mailbox机制给到browser端，以达到减少重复渲染的目的。（任何需要使用gpu渲染的进程或线程都是gpu的客户端，这里的客户端指的是render端和browser端）
 
-看到这里不得不叹息，谷歌真的好努力了，但让我觉得奇怪的是为啥解析网页这种耗时的操作也在ui线程玩？16ms真的能解析完网页吗？
+看到这里不得不叹息，谷歌真的好努力了，但让我觉得奇怪的是为啥解析网页这种耗时的操作也在ui线程玩？16ms真的能解析完网页吗？可能是我没读懂老罗的意思。
 
 ## 标记2
 
@@ -249,11 +249,9 @@ void RenderThreadManager::CommitFrameOnRT() {
 
 而前面分析到在InProcessCommandBuffer::FlushOnGpuThread 前阻塞了，一直在waitSyncToken，该方法得不到执行。
 
-感觉gpu总是很”忙“的样子。使用系统自带的 GPU 渲染模式分析工具进行分析，发现下图中红色的 issue的时间是最长的，这就很符合我看到的：**InProcessCommandBuffer::FlushOnGpuThread无法被执行。**
+感觉gpu总是很”忙“的样子。使用系统自带的 GPU 渲染模式分析工具进行分析，发现下图中红色的 issue的时间是最长的，这就很符合我看到的：**InProcessCommandBuffer::FlushOnGpuThread无法被执行。**掉帧卡顿是必然的。为什么阻塞了？gpu在忙什么？
 
 ![img](https://developer.android.google.cn/topic/performance/images/s-profiler-legend.png)
-
-gpu在性能一般的同时肩负着太多的渲染任务，这里就导致一个问题：gpu太忙，等到SurfaceFlinger合成的时候，gpu还未绘制完毕，则需要阻塞等待GPU绘制完毕，这就是我们上面看到的UIThread被阻塞的情况。掉帧卡顿是必然的。为什么阻塞了？gpu在忙什么？
 
 ## 阻塞原因
 
@@ -529,7 +527,7 @@ chromium中有browser端和render端，他们两个都是gpuClient，gpu进程�
 
 ![image](https://github.com/BAByte/pic/blob/master/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_5d57f391-41a7-4e20-81a2-301a31936470.png?raw=true)
 
-然后Blink渲染引擎的主线程也收到了事件，这里是不是懵逼？为什么是跑到Blink渲染引擎主线程收到事件？上文有提到，从老罗的分析系列文章看，render端是跑在UIThread中的，老罗给出了一张图，我在上文中也有贴出来。但是！我从systrance的图来看，这个说法感觉在较新版本的webview上，不太对。
+然后Blink渲染引擎的主线程也收到了事件，这里是不是懵逼？为什么是跑到Blink渲染引擎主线程收到事件？上文有提到，从老罗的分析系列文章看，render端是跑在UIThread中的，老罗给出了一张图，我在上文中也有贴出来。但是！我从systrance的图来看，这个说法感觉在较新版本的webview上，不太对，这下我慌了， 我应该是误解了老罗的意思。
 
 # rander端到底跑在哪个线程？
 
