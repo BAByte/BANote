@@ -40,7 +40,7 @@ Render Thread要从Main Thread同步DIsplayList，传给Gpu进行渲染到buffer
 
 ## WebView的渲染逻辑中UIThread和RenderThread都干了啥？
 
-我看了老罗关于webview的系列文章，：
+我看了老罗关于[webview的系列文章](https://blog.csdn.net/Luoshengyang/article/details/53366272)：
 
 > 在android 4.4后 Android WebView加载了Chromium动态库之后，就可以启动Chromium渲染引擎了。Chromium渲染引擎由Browser、Render和GPU三端组成。
 >
@@ -52,9 +52,7 @@ Render Thread要从Main Thread同步DIsplayList，传给Gpu进行渲染到buffer
 >
 >    在第三阶段，Android WebView会通过一个Hardware Renderer将Browser端的CC Layer Tree渲染在一个Parent Output Surface上，实际上就是通过GPU命令将Render端绘制出来的UI合成显示在App的UI窗口中。
 >
-> ————————————————
-> 版权声明：本文为CSDN博主「罗升阳」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
-> 原文链接：https://blog.csdn.net/Luoshengyang/article/details/53366272
+> 
 
 ## 性能的瓶颈到底是在UIThread还是在RenderThread？
 
