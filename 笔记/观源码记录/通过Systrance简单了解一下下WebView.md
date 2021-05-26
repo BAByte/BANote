@@ -60,6 +60,8 @@ Render Thread要从Main Thread同步DIsplayList，传给Gpu进行渲染到buffer
 
 > Systrace 是 Android4.1 中新增的性能数据采样和分析工具。它可帮助开发者收集 Android 关键子系统（如 SurfaceFlinger/SystemServer/Kernel/Input/Display 等 Framework 部分关键模块、服务，View系统等）的运行信息，从而帮助开发者更直观的分析系统瓶颈，改进性能。
 
+**注意：文中图片全在github中，所以无法查看请用tz，或者改一下自己的host**
+
 先简单了解下界面：
 
 1. 右边的两个红框就是对应线程，这里也证实了webview和普通的view都是通过这个两个线程的配合进行界面的显示的。
