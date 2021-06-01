@@ -709,9 +709,9 @@ void TileManager::FlushAndIssueSignals() {
 
 # 比Webview更好的解决方案
 
-在大佬同事的推荐下，我了解到英特尔为了解决移动端webview碎片化的问题，搞了个开源项目：https://github.com/crosswalk-project/crosswalk。
+可以使用chromium的api自己写一个webview，但是在大佬同事的推荐下，我了解到英特尔为了解决移动端webview碎片化的问题，搞了个开源项目：https://github.com/crosswalk-project/crosswalk。
 
-还使用了surfaceview，从上文分析中，我列出了一些我个人认为webview还可以优化的地方，其中就有建议使用surfaceview的，我毫不犹豫就冲了，没有花屏，也没有原来严重掉帧的情况，大喜！但是英特尔已经不维护好多年，也有一些大佬自己去编了53、77版本的chromiu内核的库，目前我使用的情况是53问题比较多，77版本的问题比较少。77接入的sample：https://github.com/ks32/CrosswalkNative/tree/master/app/libs
+使用了surfaceview，从上文分析中，我列出了一些我个人认为webview还可以优化的地方，其中就有建议使用surfaceview的，我毫不犹豫就冲了，没有花屏，也没有原来严重掉帧的情况，大喜！但是英特尔已经不维护好多年，也有一些大佬自己去编了53、77版本的chromiu内核的库，目前我使用的情况是53问题比较多，77版本的问题比较少。77接入的sample：https://github.com/ks32/CrosswalkNative/tree/master/app/libs
 
 当然也一直提到我手上要适配的设备性能太差，现在市面上的机器都比我手上的好，这是百分之百的，所以我这里其实能做一个机型区分，如果是其他机型可以直接使用原生的webview加载。
 
