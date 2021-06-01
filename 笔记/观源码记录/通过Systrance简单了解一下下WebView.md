@@ -235,7 +235,7 @@ void RenderThreadManager::CommitFrameOnRT() {
 
 ![image](https://github.com/BAByte/pic/blob/master/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_64e17aab-82a2-4417-bfc1-46301876d1f0.png?raw=true)
 
-就是在将Render端渲染的ui合成并显示到屏幕上，这里面设置到了chromium的渲染流水线，我就不去分析他的过程了。 
+就是在将Render端渲染的ui合成并显示到屏幕上，这里面涉及到了chromium的渲染流水线，我就不去分析他的过程了。 
 
 从下图中可以看出来 ：执行CommandBufferHelper的Flush，最终调用到DeferredGpuCommandService执行Task去ipc通知gpu进程，达到提交CommandBuffer到gpu进程，并执行gpu指令的目的。CommandBufferHelper有个子类GLES2CmdHelper，它负责将Browser端需要执行的gpu指令写入到CommandBuffer中
 
