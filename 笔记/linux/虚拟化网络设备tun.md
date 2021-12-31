@@ -1,12 +1,14 @@
 [toc]
 
-# 虚拟化网络设备
+# 虚拟化网络设备tun
 
 > 在[计算机网络](https://zh.wikipedia.org/wiki/计算机网络)中，**TUN**与**TAP**是操作系统内核中的虚拟网络设备。不同于普通靠硬件[网络适配器](https://zh.wikipedia.org/wiki/网络适配器)实现的设备，这些虚拟的网络设备全部用软件实现，并向运行于[操作系统](https://zh.wikipedia.org/wiki/操作系统)上的软件提供与硬件的网络设备完全相同的功能。
 >
 > **TAP**等同于一个[以太网](https://zh.wikipedia.org/wiki/以太网)设备，它操作[第二层](https://zh.wikipedia.org/wiki/OSI模型)数据包如[以太网](https://zh.wikipedia.org/wiki/以太网)数据帧。**TUN**模拟了[网络层](https://zh.wikipedia.org/wiki/网络层)设备，操作[第三层](https://zh.wikipedia.org/wiki/OSI模型)数据包比如[IP](https://zh.wikipedia.org/wiki/IP地址)数据包。
 
-## tun
+本文我们只学习tun。
+
+# tun
 
 我们用一个安卓设备连接无线网络，其无线网卡对应的网络接口是wlan0，其背后对应的是真实的物理网卡，当应用程序对外发送网络数据包时，数据流向如下：
 
@@ -22,29 +24,22 @@ tun0接口背后是创建该接口的应用程序，这个应用程序可以对�
 
 注：我这里先列出总体的流程，步骤的细节后面一点再看。
 
-## 发送数据
+# 发送数据
 
 当应用程序对外发送网络数据包时，数据流向如下：
 
 ![image](https://github.com/BAByte/pic/blob/master/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%AA%E5%9B%BE_234535e5-5c23-4322-b5a2-33edbe158aff.png?raw=true)
 
 1. app通过socket接口发送数据。
-
 2. 内核中将数据都路由到tun0接口。（为什么会路由到tun0？这里记为问题1 下文会讲到）
-
 3. CaptureApp通过io模型中的其中一种模型，知道了tun0设备有数据可以读取，这一步将内核态的网络数据拷贝到了用户态的进程中。用户进程就可以对这些数据进行处理。
-
-   如果是vpn应用：会对数据包进行加密”，我们只需要理解两者都是对捕获到的数据包进行处理就好；如果是抓包应用：会将数据展示给用户。注意：从网卡读取到的数据其实已经是字节流，CaptureApp是需要对数据进行各个协议栈的拆包，有两种实现“OpenVPN 和 tun2socks.so，下文会讲讲。
-
 4. CaptureApp使用socket接口将数据丢回协议栈。
-
 5. 数据被路由到Wlan0接口，并通过物联网卡与互联网进行通信。（为什么会路由到wlan0？下面会讲，这里记为问题2）
-
 6. 数据包出去环游世界。
 
 这里的流程一共经过两次协议栈！
 
-## 接收数据
+# 接收数据
 
 当通过CaptureApp程序发送的数据被外部服务器响应时，数据流向如下
 
@@ -54,16 +49,24 @@ tun0接口背后是创建该接口的应用程序，这个应用程序可以对�
 2. 流转到协议栈中。
 3. 数据包通过协议栈流转到CaptureApp，因为请求包是由CaptureApp发出的，端口号对对应的进程是CaptureApp。CaptureApp处理数据
 4. CaptureApp将处理后的数据写到tun0。
-5. tun0将数据丢回到协议栈。
-6. 数据包流经协议栈流转到了App，App并不知道CaptureApp处理过了数据。
+5. tun0将数据丢回到协议栈。（仿佛数据是从外部流入的一样）
+6. 数据包流经协议栈流转到了App（这里很好理解，就是端口号指定了app），App并不知道CaptureApp处理过了数据。
 
 这里的流程一共经过两次协议栈！
 
-## 问题1-为什么会路由到tun0
+# 问题1-为什么会路由到tun0
 
-我写了一个vpn程序：创建了tun0虚拟网卡，并告诉系统只有uid = 10068的应用数据需要路由到tun0，是的，哪些数据包该路由到tun0设备是我们设置的，这需要配置路由表和iptables。
+我写了一个vpn程序：创建了tun0虚拟网卡，并告诉系统只有uid = 10068的应用数据需要路由到tun0，是的，哪些数据包该路由到tun0设备是我们设置的。
 
-在安卓系统上配置路由表和iptables并不需要开发者知道这两者的相关知识，只需要调用一个函数即可。所以我们看看在创建了tun0设备后的路由策略，下面是安卓查看路由策略的命令：
+在对上层应用的数据包进行分流时，采用的是多路由表的方式，我们可以定义多个路由策略，内核根据路由策略选择路由表。
+
+选择的路由策略的过程：
+
+1. 根据路由策略优先级选，先选优先级高的
+2. 我们可以使用iptables的mangle规则对数据包的标记实现，而路由策略声明自己适合哪些标记的数据包
+3. 但在安卓上的路由策略还增加了uid的范围匹配，因为安卓会使用uid区分应用
+
+我们看看在创建了tun0设备后的路由策略，下面是安卓查看路由策略的命令：
 
 ~~~txt
 XP12:/ # ip rule list
@@ -104,7 +107,7 @@ broadcast 192.168.31.255 dev wlan0 proto kernel scope link src 192.168.31.141
 
 可以看到第一条就指向了tun0这张路由表，（上文我们提到过：当我们给虚拟网卡分配ip时就会自动创建对应的路由表）。ip地址前面声明了个local，意味着本机内的通信会先从tun0路由表查找路由。
 
-那和外部的通信又是怎么路由到tun0的呢？我们再回到路由策略看看其他路由表的优先级：
+那和外部的通信(目的ip地址不是local的) 又是怎么路由到tun0的呢？ 我们再回到路由策略看看其他路由表的优先级：
 
 ~~~txt
 XP12:/ # ip rule list
@@ -129,7 +132,54 @@ XP12:/ # ip rule list
 32000:	from all unreachable
 ~~~
 
-可以看到uid 范围在 10068-10068内的数据都去tun0路由表查找路由，所以外部的通信是先发给tun0的。
+可以看到uid 范围在 10068-10068内的数据都去tun0路由表查找路由，所以uid=10068应用的与外部通信的数据包是先发给tun0的。
 
-## 问题2-CaptureApp发出的数据包为什么会从wlan0出去
+# 问题2-CaptureApp发出的数据包为什么会从wlan0出去
+
+在问题1中已经解答了，只有uid=10068应用的应用才会流到tun0，而CaptureApp的uid不等于10068。假设我们指定所有应用的数据包都由tun0接收并交由CaptureApp处理，那这时候CaptureApp的数据又是怎么从wlan0出去的？
+
+指定拦截所有应用的数据时，路由策略如下:
+
+~~~txt
+XP12:/ # ip rule
+0:	from all lookup local
+10000:	from all fwmark 0xc0000/0xd0000 lookup legacy_system
+10500:	from all iif lo oif wlan0 uidrange 0-0 lookup wlan0
+11000:	from all iif tun0 lookup local_network
+12000:	from all fwmark 0x0/0x20000 iif lo uidrange 0-99999 lookup tun0
+12000:	from all fwmark 0xc0090/0xcffff lookup tun0
+13000:	from all fwmark 0x10063/0x1ffff iif lo lookup local_network
+13000:	from all fwmark 0x1008c/0x1ffff iif lo lookup wlan0
+13000:	from all fwmark 0x10090/0x1ffff iif lo uidrange 0-99999 lookup tun0
+13000:	from all fwmark 0x10090/0x1ffff iif lo uidrange 0-0 lookup tun0
+14000:	from all iif lo oif wlan0 lookup wlan0
+14000:	from all iif lo oif tun0 uidrange 0-99999 lookup tun0
+15000:	from all fwmark 0x0/0x10000 lookup legacy_system
+16000:	from all fwmark 0x0/0x10000 lookup legacy_network
+17000:	from all fwmark 0x0/0x10000 lookup local_network
+19000:	from all fwmark 0x8c/0x1ffff iif lo lookup wlan0
+21000:	from all fwmark 0x90/0x1ffff lookup wlan0
+22000:	from all fwmark 0x0/0xffff iif lo lookup wlan0
+32000:	from all unreachable
+~~~
+
+看优先级 = 12000的策略中声明了：uidrange 0-99999 lookup tun0，如果只看uid确实是全部都拦截的，也就是说CaptureApp的数据会到tun0再回到CaptureApp，形成回环。这时就得看标记了（注：标记应该是先判断的，我这里只是为了好理解换了下顺序，我们只需要知道得全部满足才会选择某个路由策略）
+
+可以看到路由策略中有fwmark字段，后面定义了mark的规则，为什么说是规则呢？
+
+设计者为了让标记灵活性和扩展性更加灵活，允许对标记进行与或运算而实现多重标记功能，这种标记位的使用很常见（可以看：[BANote/安卓源码中常用的Flag语句.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/读安卓开发艺术探索笔记/安卓源码中常用的Flag语句.md)）
+
+~~~txt
+fwmark 0x0/0x20000
+~~~
+
+# CaptureApp如何处理数据
+
+如果是vpn应用：会对数据包进行加密”，我们只需要理解两者都是对捕获到的数据包进行处理就好；如果是抓包应用：会将数据展示给用户。注意：从网卡读取到的数据其实已经是字节流，CaptureApp是需要对数据进行各个协议栈的拆包，有两种实现“OpenVPN 和 tun2socks.so，下文会讲讲。
+
+
+
+
+
+
 
