@@ -267,7 +267,13 @@ XP12:/ # ip rule list
 
 对于ip数据包的处理，常见有两种实现，可以自行去了解：OpenVPN 和 tun2socks.so。
 
+# 结
 
+这篇笔记涉及到虚拟网络设备tun，策略路由，vpn的相关知识。不会很具体也不会有实操，只是简单的谈谈整体思路。
+
+我本意是想知道tun是什么，能干什么，但在了解策略路由时我钻了牛角尖，花了很大力气去研究安卓的策略路由所以浪费了很多时间。而tun2socks.so这些库本身也是比较有意思和复杂的东西，本笔记要是写太多就会很杂乱。
+
+现在我们已经知道了常用的抓包工具是通过代理（看这个：[BANote/网络通信中的五个钩子.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/网络通信中的五个钩子.md)）和vpn实现，那linux中的tcpdump工具又是怎么实现抓包的呢？请看：（todo 写了后贴链接在这里）
 
 
 
