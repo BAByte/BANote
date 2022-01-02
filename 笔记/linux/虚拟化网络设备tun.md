@@ -56,17 +56,37 @@ tun0接口背后是创建该接口的应用程序，这个应用程序可以对�
 
 # 问题1-为什么会路由到tun0
 
-我写了一个vpn程序：创建了tun0虚拟网卡，并告诉系统只有uid = 10068的应用数据需要路由到tun0，是的，哪些数据包该路由到tun0设备是我们设置的。
-
 在对上层应用的数据包进行分流时，采用的是多路由表的方式，我们可以定义多个路由策略，内核根据路由策略选择路由表。
+
+## linux默认路由表的补充知识：
+
+> 在 Linux 系统启动时，内核会为路由策略数据库配置三条缺省的规则：
+>
+> 0：匹配任何条件，查询路由表local(ID 255)，该表local是一个特殊的路由表，包含对于本地和广播地址的优先级控制路由。rule 0非常特殊，不能被删除或者覆盖。
+>
+> 匹配任何条件，查询路由表main(ID 254)，该表是一个通常的表，包含所有的无策略路由。系统管理员可以删除或者使用另外的规则覆盖这条规则。
+>
+> 匹配任何条件，查询路由表default(ID 253)，该表是一个空表，它是后续处理保留。对于前面的策略没有匹配到的数据包，系统使用这个策略进行处理，这个规则也可以删除。
+>
+> **注：**不要混淆路由表和策略：规则指向路由表，多个规则可以引用一个路由表，而且某些路由表可以策略指向它。如果系统管理员删除了指向某个路由表的所有规则，这个表没有用了，但是仍然存在，直到里面的所有路由都被删除，它才会消失。
+>
+> 来源：[linux网络知识：路由策略（ip rule，ip route） - 知乎 (zhihu.com)](https://zhuanlan.zhihu.com/p/144585950)
+
+
+
+## 策略路由
+
+策略路由是指主机存在多张网卡时，可以根据一些策略选择对应的路由表，进而决定使用哪张网卡进行网络通信。
 
 选择的路由策略的过程：
 
 1. 根据路由策略优先级选，先选优先级高的
-2. 我们可以使用iptables的mangle规则对数据包的标记实现，而路由策略声明自己适合哪些标记的数据包
+2. 我们可以使用iptables的mangle规则对数据包的标记实现（安卓上略有不同，后面会讲到），而路由策略声明自己适合哪些标记的数据包
 3. 但在安卓上的路由策略还增加了uid的范围匹配，因为安卓会使用uid区分应用
 
-我们看看在创建了tun0设备后的路由策略，下面是安卓查看路由策略的命令：
+如果我们创建了tun0虚拟网卡，并将ip设置为10.1.10.1（这时系统会自动创建tun0设备对应名为tun0的路由表），并告诉系统只有uid = 10068的应用数据需要路由到tun0。我们看看操作后的路由策略：
+
+**（注：ip rule list 是安卓查看路由策略的命令）**
 
 ~~~txt
 XP12:/ # ip rule list
@@ -91,7 +111,9 @@ XP12:/ # ip rule list
 32000:	from all unreachable
 ~~~
 
-第一列代表优先级，数字越小优先级越高，所以所有的数据都先从名为local的路由表查找路由。我们看看local路由表的内容：
+第一列代表优先级，数字越小优先级越高，第一条代表的意思是：
+
+所以所有的数据都先从名为local的路由表查找路由。接下来我们看看local路由表的内容：
 
 ~~~txt
 XP12:/ # ip route list table local
@@ -105,79 +127,145 @@ local 192.168.31.141 dev wlan0 proto kernel scope host src 192.168.31.141
 broadcast 192.168.31.255 dev wlan0 proto kernel scope link src 192.168.31.141
 ~~~
 
-可以看到第一条就指向了tun0这张路由表，（上文我们提到过：当我们给虚拟网卡分配ip时就会自动创建对应的路由表）。ip地址前面声明了个local，意味着本机内的通信会先从tun0路由表查找路由。
+可以看到第一条就指向了tun0这张路由表，（上文我们提到过：当我们给虚拟网卡分配ip时就会自动创建对应的路由表）。ip地址前面声明了个local，意味着本机内进程的网络通信，目的地址为10.1.10.1的数据包，会从tun0路由表查找路由。
 
-那和外部的通信(目的ip地址不是local的) 又是怎么路由到tun0的呢？ 我们再回到路由策略看看其他路由表的优先级：
+看看tun0路由表的内容：
+
+~~~txt
+XP12:/ # ip route list table tun0
+//所有数据包发送到tun0设备
+default dev tun0 proto static scope link
+//目的地址为10.1.10.1的数据包也发到tun0设备
+10.1.10.1 dev tun0 proto static scope link
+~~~
+
+我们现在就知道了：tun0路由表会把所有数据包都发到tun0接口，进而提供数据给连接tun0端的CaptureApp。
+
+那和目的地址不为10.1.10.1的数据包又是怎么匹配到tun0路由表的呢？ 路由策略还有其他的匹配规则，我们先一一看下规则含义
+
+1. form all？
+
+   没有明确指定网卡ip的数据包，form eth0是明确的指定了eth0的数据包，form 192.168.21.1是明确指定ip为192.168.21.1的网卡
+
+2. mark是什么？
+
+   数据包会带有一些标记用对数据包做追踪，而设计者为了让标记灵活性和扩展性更加灵活，允许对标记进行与或运算而实现多重标记功能，这种标记位的使用很常见（可以看我几年前写的笔记：[BANote/安卓源码中常用的Flag语句.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/读安卓开发艺术探索笔记/安卓源码中常用的Flag语句.md)），而策略路由中需要配合fwmark使用。
+
+3. fwmark是什么？
+
+   在路由策略中对数据包mark进行匹配的匹配规则，路由策略上的fwmark通常格式有两种：值、值/掩码。如果只有值就只关心数据包的标记是否和路由策略声明的一致；有掩码的情况下，需要将数据包的标记与掩码相与，再将相与的结果和策略的值比较，如果一致就是命中。例子：标记一般是十六进制，但这里我用二进制举例子，数据包携带的标记二进制为111，路由策略上声明的是：100/100，本例中可以命中。
+
+4. 16进制mark的含义？
+
+   这个得看场景而定，不同人使用mark时对其各个位的功能定义不一样，安卓使用了17位，从低位到高位的定义如下：
+
+   ~~~c++
+   //安卓标记：
+   //http://aospxref.com/android-9.0.0_r61/xref/system/netd/include/Fwmark.h?fi=FWMARK_NET_ID_MASK#FWMARK_NET_ID_MASK
+   union Fwmark {
+   25      uint32_t intValue;
+   26      struct {
+   27          unsigned netId          : 16; //网卡id
+   28          bool explicitlySelected :  1; //数据包是否指定了网卡
+   29          bool protectedFromVpn   :  1; //是否绕过vpn接口
+   30          Permission permission   :  2; //数据包发出应用的权限，11代表系统应用，且有网络权限，10代表有网络权限的应用
+   31          bool uidBillingDone     :  1;  // 我也不晓得啥意思
+   32      };
+   ~~~
+
+5. uidrange 10068-10068是什么意思？
+
+   安卓中对路由策略的匹配新增了一个uid匹配的条件，这里是必须是uid范围在 10068-10068的应用数据包才能会被匹。
+
+6. iif和oif是什么意思？
+
+   表明数据是从哪个网口输入的，那个网口输出的。
+
+了解了这些知识后我们再次看看各路由策略的含义
 
 ~~~txt
 XP12:/ # ip rule list
 0:	from all lookup local
+//没有指定网口ip，并有网络权限的应用查找legacy_system表
 10000:	from all fwmark 0xc0000/0xd0000 lookup legacy_system
+
+//没有指定网口ip，指定输出到wlan0网口的root权限应用查找wlan0
 10500:	from all iif lo oif wlan0 uidrange 0-0 lookup wlan0
+
+//没有指定网口ip，从tun0网口输入的查找local_network
 11000:	from all iif tun0 lookup local_network
+
+//没有指定网口ip，没有标记，且从lo网口输入，uid是10068发出的数据包查找tun0路由表
 12000:	from all fwmark 0x0/0x20000 iif lo uidrange 10068-10068 lookup tun0
+
+//没有指定网口ip，指定网络id为88的数据包，查找tun0路由表
 12000:	from all fwmark 0xc0088/0xcffff lookup tun0
+
+//没有指定网口ip，从lo网口输入，查找local_network路由表
 13000:	from all fwmark 0x10063/0x1ffff iif lo lookup local_network
+
+//没有指定网口ip，从lo网口输入，查找wlan0路由表
 13000:	from all fwmark 0x10072/0x1ffff iif lo lookup wlan0
+
+//没有指定网口ip，从lo网口输入，查找tun0路由表
 13000:	from all fwmark 0x10088/0x1ffff iif lo uidrange 10068-10068 lookup tun0
+
+//没有指定网口ip，从lo网口输入，由root应用发出的数据包，查找tun0路由表
 13000:	from all fwmark 0x10088/0x1ffff iif lo uidrange 0-0 lookup tun0
+
+//没有指定网口ip，从lo网口输入，从wlan0网口输出的数据包，查找wlan0路由表
 14000:	from all iif lo oif wlan0 lookup wlan0
+
+//没有指定网口ip，从lo网口输入，从tun0网口输出，uid是10068发出的数据包，查找tun0路由表
 14000:	from all iif lo oif tun0 uidrange 10068-10068 lookup tun0
+
+//没有指定网口ip，查找legacy_system、legacy_network、local_network路由表
 15000:	from all fwmark 0x0/0x10000 lookup legacy_system
 16000:	from all fwmark 0x0/0x10000 lookup legacy_network
 17000:	from all fwmark 0x0/0x10000 lookup local_network
+
+//没有指定网口ip，指定网络id为72，从lo接口输入的数据包，查找wlan0路由表
 19000:	from all fwmark 0x72/0x1ffff iif lo lookup wlan0
+
+//没有指定网口ip，这里的指定网卡标记位不管是0还是1，只要网络id为88，查找wlan0路由表
 21000:	from all fwmark 0x88/0x1ffff lookup wlan0
+
+//没有指定网口ip，没有标记，从lo输入的数据包，查找wlan0路由表
 22000:	from all fwmark 0x0/0xffff iif lo lookup wlan0
 32000:	from all unreachable
 ~~~
 
-可以看到uid 范围在 10068-10068内的数据都去tun0路由表查找路由，所以uid=10068应用的与外部通信的数据包是先发给tun0的。
+至此，我们就知道：
+
+1. 路由策略优先级优先将目的地址为10.1.10.1通过tun0路由表选择路由
+2. 指定网络id为88的数据包，查找tun0路由表
+3. 没有指定网口ip，没有标记，且从lo网口输入，uid是10068发出的数据包查找tun0路由表
+4. 没有指定网口ip，从lo网口输入，由root应用发出的数据包，查找tun0路由表
+5. 没有指定网口ip，从lo网口输入，从tun0网口输出，uid是10068发出的数据包，查找tun0路由表
 
 # 问题2-CaptureApp发出的数据包为什么会从wlan0出去
 
-在问题1中已经解答了，只有uid=10068应用的应用才会流到tun0，而CaptureApp的uid不等于10068。假设我们指定所有应用的数据包都由tun0接收并交由CaptureApp处理，那这时候CaptureApp的数据又是怎么从wlan0出去的？
+在问题一中其实已经解答了：通过策略路由。而安卓中的策略路由比较有意思，有关tun0路由表的路由策略都要求protectedFromVpn = 0，所以protectedFromVpn=1是不会被路由到wlan0的。
 
-指定拦截所有应用的数据时，路由策略如下:
+# 数据包标记是什么时候打上的？
 
-~~~txt
-XP12:/ # ip rule
-0:	from all lookup local
-10000:	from all fwmark 0xc0000/0xd0000 lookup legacy_system
-10500:	from all iif lo oif wlan0 uidrange 0-0 lookup wlan0
-11000:	from all iif tun0 lookup local_network
-12000:	from all fwmark 0x0/0x20000 iif lo uidrange 0-99999 lookup tun0
-12000:	from all fwmark 0xc0090/0xcffff lookup tun0
-13000:	from all fwmark 0x10063/0x1ffff iif lo lookup local_network
-13000:	from all fwmark 0x1008c/0x1ffff iif lo lookup wlan0
-13000:	from all fwmark 0x10090/0x1ffff iif lo uidrange 0-99999 lookup tun0
-13000:	from all fwmark 0x10090/0x1ffff iif lo uidrange 0-0 lookup tun0
-14000:	from all iif lo oif wlan0 lookup wlan0
-14000:	from all iif lo oif tun0 uidrange 0-99999 lookup tun0
-15000:	from all fwmark 0x0/0x10000 lookup legacy_system
-16000:	from all fwmark 0x0/0x10000 lookup legacy_network
-17000:	from all fwmark 0x0/0x10000 lookup local_network
-19000:	from all fwmark 0x8c/0x1ffff iif lo lookup wlan0
-21000:	from all fwmark 0x90/0x1ffff lookup wlan0
-22000:	from all fwmark 0x0/0xffff iif lo lookup wlan0
-32000:	from all unreachable
-~~~
++ linux上使用iptables的规则链打，一般是通过数据包的源地址和目的地址打上不同的标记，或者直接通过数据包的源地址和目的地址设置选择路由的策略，或者端口等，可以自行查看iptables相关内容。
 
-看优先级 = 12000的策略中声明了：uidrange 0-99999 lookup tun0，如果只看uid确实是全部都拦截的，也就是说CaptureApp的数据会到tun0再回到CaptureApp，形成回环。这时就得看标记了（注：标记应该是先判断的，我这里只是为了好理解换了下顺序，我们只需要知道得全部满足才会选择某个路由策略）
-
-可以看到路由策略中有fwmark字段，后面定义了mark的规则，为什么说是规则呢？
-
-设计者为了让标记灵活性和扩展性更加灵活，允许对标记进行与或运算而实现多重标记功能，这种标记位的使用很常见（可以看：[BANote/安卓源码中常用的Flag语句.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/读安卓开发艺术探索笔记/安卓源码中常用的Flag语句.md)）
-
-~~~txt
-fwmark 0x0/0x20000
-~~~
++ 安卓并没有用的iptables的规则链打标记的方式实现策略路由，安卓是基于socket来打标记的，FwmarkService负责对监听和标记数据包，细节我就不分析了（安卓策略路由实现我目前还很模糊，我用了很多天才发现安卓的策略路由和linux不一样，所以我会另开一篇笔记进行分析，本篇主要是讲虚拟网卡tun0）。
 
 # CaptureApp如何处理数据
 
-如果是vpn应用：会对数据包进行加密”，我们只需要理解两者都是对捕获到的数据包进行处理就好；如果是抓包应用：会将数据展示给用户。注意：从网卡读取到的数据其实已经是字节流，CaptureApp是需要对数据进行各个协议栈的拆包，有两种实现“OpenVPN 和 tun2socks.so，下文会讲讲。
+开篇也提到，其实是有两个常见虚拟设备tun和tap，所以CaptureApp获取到的数据是ip数据报或者帧。而socket接口只支持发送tcp、udp包：
 
++ 假设CaptureApp是一个抓包app
 
+  可以将其恢复成各协议层的数据格式，并将各层的数据展示给用户，然后可以直接使用udp将数据发出去。
+
++ 假设CaptureApp是一个vpnApp
+
+  你需要对数据包进行加密，然后转发给代理服务器。
+
+对于ip数据包的处理，常见有两种实现，可以自行去了解：OpenVPN 和 tun2socks.so。
 
 
 
