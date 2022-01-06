@@ -261,11 +261,11 @@ XP12:/ # ip rule list
 
   可以将其恢复成各协议层的数据格式，并将各层的数据展示给用户，然后可以直接使用udp将数据发出去。
 
+  安卓中我找到个不错的开源项目：[huolizhuminh/NetWorkPacketCapture: It is used to capture network packet via Android VPN. (github.com)](https://github.com/huolizhuminh/NetWorkPacketCapture)
+
 + 假设CaptureApp是一个vpnApp
 
-  你需要对数据包进行加密，然后转发给代理服务器。
-
-对于ip数据包的处理，常见有两种实现，可以自行去了解：OpenVPN 和 tun2socks.so。
+  你需要对数据包进行加密，然后转发给代理服务器。对于ip数据包的处理，常见有两种实现，可以自行去了解：OpenVPN 和 tun2socks.so。
 
 # 结
 
@@ -273,7 +273,25 @@ XP12:/ # ip rule list
 
 我本意是想知道tun是什么，能干什么，但在了解策略路由时我钻了牛角尖，花了很大力气去研究安卓的策略路由所以浪费了很多时间。而tun2socks.so这些库本身也是比较有意思和复杂的东西，本笔记要是写太多就会很杂乱。
 
-现在我们已经知道了常用的抓包工具是通过代理（看这个：[BANote/网络通信中的五个钩子.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/网络通信中的五个钩子.md)）和vpn实现，那linux中的tcpdump工具又是怎么实现抓包的呢？请看：（todo 写了后贴链接在这里）
+现在我们已经知道了常用的抓包工具是通过代理（看这个：[BANote/网络通信中的五个钩子.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/网络通信中的五个钩子.md)）和vpn实现。
+
+但是通过上文我们也知道：策略路由的local优先级是最高的，内容如下：
+
+~~~txt
+XP12:/ # ip route list table local
+local 10.1.10.1 dev tun0 proto kernel scope host src 10.1.10.1
+broadcast 127.0.0.0 dev lo proto kernel scope link src 127.0.0.1
+local 127.0.0.0/8 dev lo proto kernel scope host src 127.0.0.1
+local 127.0.0.1 dev lo proto kernel scope host src 127.0.0.1
+broadcast 127.255.255.255 dev lo proto kernel scope link src 127.0.0.1
+broadcast 192.168.31.0 dev wlan0 proto kernel scope link src 192.168.31.141
+local 192.168.31.141 dev wlan0 proto kernel scope host src 192.168.31.141
+broadcast 192.168.31.255 dev wlan0 proto kernel scope link src 192.168.31.141
+~~~
+
+也就是说，127这些本地链路是不会流转到tun0网口的，除非我们配置这个local路由表。
+
+嗯，很麻烦，可是我在使用tcpdump又可以直接抓到127.0.0.1的包，它又是怎么实现抓包的呢？请看：（todo 写了后贴链接在这里）
 
 
 
