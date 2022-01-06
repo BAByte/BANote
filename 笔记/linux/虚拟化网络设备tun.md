@@ -6,7 +6,7 @@
 >
 > **TAP**等同于一个[以太网](https://zh.wikipedia.org/wiki/以太网)设备，它操作[第二层](https://zh.wikipedia.org/wiki/OSI模型)数据包如[以太网](https://zh.wikipedia.org/wiki/以太网)数据帧。**TUN**模拟了[网络层](https://zh.wikipedia.org/wiki/网络层)设备，操作[第三层](https://zh.wikipedia.org/wiki/OSI模型)数据包比如[IP](https://zh.wikipedia.org/wiki/IP地址)数据包。
 
-本文我们只学习tun。
+在了解了[BANote/网络通信中的五个钩子.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/网络通信中的五个钩子.md)后，发现使用iptables实现抓包和vpn是比较麻烦的，且性能也差。本文我们学习tun，看看如果使用虚拟网络设备实现对数据包的处理会不会简单点，性能会不会好一点。
 
 # tun
 
@@ -291,7 +291,7 @@ broadcast 192.168.31.255 dev wlan0 proto kernel scope link src 192.168.31.141
 
 也就是说，127这些本地链路是不会流转到tun0网口的，除非我们配置这个local路由表。
 
-嗯，很麻烦，可是我在使用tcpdump又可以直接抓到127.0.0.1的包，它又是怎么实现抓包的呢？请看：（todo 写了后贴链接在这里）
+嗯，很麻烦，可是我在使用tcpdump又可以直接抓到127.0.0.1的包，它又是怎么实现抓包的呢？请看：[BANote/TcpDump 实现浅析.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/TcpDump 实现浅析.md)）
 
 
 
