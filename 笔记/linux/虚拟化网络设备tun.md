@@ -289,7 +289,7 @@ local 192.168.31.141 dev wlan0 proto kernel scope host src 192.168.31.141
 broadcast 192.168.31.255 dev wlan0 proto kernel scope link src 192.168.31.141
 ~~~
 
-也就是说，127这些本地链路是不会流转到tun0网口的，除非我们配置这个local路由表、使用nat、fwmark。我努力了下，太菜了，搞了很久都没成功，但在使用tcpdump可以直接抓到127.0.0.1的包，它又是怎么实现抓包的呢？请看：[BANote/TcpDump 实现浅析.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/笔记/linux/TcpDump 实现浅析.md)）
+也就是说，127这些本地链路是不会流转到tun0网口的，除非我们配置这个local路由表、使用nat、fwmark。我努力了下，太菜了，搞了很久都没成功，但在使用tcpdump可以直接抓到127.0.0.1的包，它又是怎么实现抓包的呢？请看：[BANote/TcpDump 实现浅析.md at master · BAByte/BANote (github.com)](https://github.com/BAByte/BANote/blob/master/%E7%AC%94%E8%AE%B0/linux/TcpDump%E5%AE%9E%E7%8E%B0%E6%B5%85%E6%9E%90.md)）
 
 
 
