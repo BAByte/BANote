@@ -39,6 +39,7 @@ webRtc就是一个集大成者，其使用了很多现有的标准协议进行�
 # ICE
 
 webrtc使用Trickle ICE完成上述流程，Trickle ICE 是ICE的优化版本，但大部分特性是一致的，所以都要了解一下，不过在了解ICE前，我们先简单的了解这个过程中出现的角色：
+
 1.client：主动发起方和被动发起连接方，在ice中定义为控制方和受控方。（双方都可以是连接的发起者，所以可能在过程中可能会有角色冲突的问题但本文不提及，感兴趣自己查）。
 
 2.信令服务器：在未建立对等连接前，client就是通过信令服务器进行通信的，该服务器需要自己部署，具体的通信协议不做要求，但webrtc有定义传输的数据结构：SessionDescription（sdp）。
@@ -48,7 +49,8 @@ webrtc使用Trickle ICE完成上述流程，Trickle ICE 是ICE的优化版本，
 4.TURN：中继服务，当无法建立p2p对等连接后，直接使用中继服务器进行连接的建立，该服务器需要自己部署。
 
 注：
-\1. ice：Interactive Connectivity Establishment 
+1. ice：Interactive Connectivity Establishment 
+
 2.ice类型：有full ice和lite ice，本文的ice都指full ice。
 
 ## “传统”ICE
@@ -64,6 +66,7 @@ candidate：包含ip和端口信息。
 
 
 ice流程：
+
 1.clientA采集candidate的信息然后和offer信息一起，通过信令服务器发送给clientB，clientB收到携带candidate和offer的sdp后才进行candidate的采集。
 
 2.最后再answer clientA。
@@ -101,9 +104,9 @@ ice流程：
 
 所以无论是ICE还是Trickle ICE，他们的核心都是：尽可能的收集更多的candidate。
 
-\1. candidate里面有啥？
+1. candidate里面有啥？
 
-\2. 采集candidate的过程是怎样的？
+2. 采集candidate的过程是怎样的？
 
 3.如何使用candidate建立连接？
 
@@ -116,7 +119,7 @@ ice流程：
 
 candidate的常用地址类型：
 1.host：本地网卡的地址。
-\2. srflx：公网地址。
+2. srflx：公网地址。
 3.relay：中继服务器地址。
 
 (具体内容可以看文末ice的rfc文档)
@@ -182,7 +185,7 @@ candidate的常用地址类型：
 
 2.ice会对这些candidate进行配对，比如：clientA有三个candidate，clientB有三个candidata，那就会有9对candidate。
 
-\3. 按优先级排序candidate对，形成检查表。有一个优先级算法，可以看rfc8445。
+3. 按优先级排序candidate对，形成检查表。有一个优先级算法，可以看rfc8445。
 
 4.对这些candidate进行连通性检测，通过的会成为提名候选地址对。
 
@@ -210,7 +213,7 @@ host > srflx > relay
 
 所以很有可能relay类型的candidate会比其他类型早到，你可以这样测试：
 1.过滤掉host和srflx类型的candidate，再发送candidate给对端。
-\2. 过滤掉对端发送来的host和srflx类型candidate，抓个包你就会发现是使用中继模式了。
+2. 过滤掉对端发送来的host和srflx类型candidate，抓个包你就会发现是使用中继模式了。
 
 
 
@@ -322,7 +325,7 @@ host > srflx > relay
 
 6.连通性检测通过的candidate对会被加入有效列表中，rfc8445中说只有一个数据流的所有组件都匹配到有效的candidate，连通性检查才会结束，这个组件其实是指一些协议例如rtp，rtcp等，我想这是因为不同的协议可能是tcp或者udp，而candidate是区分传输协议的，所有要匹配到对应协议的candidate才行。
 
-\7. 经过连通性检测后，nat的映射表中就有记录了，也就是我们说的打洞成功（这里特指p2p），那双方其实已经可以根据Candidate的ip和端口进行通信了。
+7. 经过连通性检测后，nat的映射表中就有记录了，也就是我们说的打洞成功（这里特指p2p），那双方其实已经可以根据Candidate的ip和端口进行通信了。
 
 # 相关文档：
 
