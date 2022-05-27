@@ -213,7 +213,9 @@ host > srflx > relay
 3.对方收到candidate的顺序：webrtc没有规定信令服务器的实现，所以无法保证传递candidate是可靠的（传输的可靠性定义可以看计算机网络的相关知识）
 
 所以很有可能relay类型的candidate会比其他类型早到，你可以这样测试：
+
 1.过滤掉host和srflx类型的candidate，再发送candidate给对端。
+
 2. 过滤掉对端发送来的host和srflx类型candidate，抓个包你就会发现是使用中继模式了。
 
 
