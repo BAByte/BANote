@@ -42,7 +42,7 @@ DSL是 Domain Specific Language 的缩写，中文翻译为*领域特定语言*�
 
 1. 初始化阶段：project实例在这⼉创建，如果有多个模块，即有多个build.gradle⽂件，多个 project将会被创建。 
 2.  配置阶段：在该阶段，build.gradle脚本将会执⾏，为每个project创建和配置所有的tasks。 
-3. 执⾏阶段：这⼀阶段，gradle会决定哪⼀个tasks会被执⾏，哪⼀个tasks会被执⾏完全依赖开 始构建时传⼊的参数和当前所在的⽂件夹位置有关。
+3. 执⾏阶段：这⼀阶段，gradle会决定哪⼀个tasks会被执⾏，哪⼀个tasks会被执⾏完全依赖开始构建时传⼊的参数和当前所在的⽂件夹位置有关，用的是链表管理这些顺序（因为task在初始化顺序时，一些task的顺序是由plugin和gradle默认的配置决定的，我们自己也可能插入task，所以更多的是插入，用链表合适）。
 
 
 
@@ -748,7 +748,7 @@ BUILD SUCCESSFUL in 493ms
 
 ## Task的依赖
 
-task的主要核心是action，根据action队列顺序执行。在添加action时可以指定位置插入队列。
+task的主要核心是action，根据action队列顺序执行。在添加action时可以指定位置插入队列，如头部，尾部，指定的某个task之后。
 
 
 
